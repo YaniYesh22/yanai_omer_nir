@@ -1,0 +1,45 @@
+service: serverless-offline-sqs
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  environment:
+    AWS_ACCESS_KEY_ID: local
+    AWS_SECRET_ACCESS_KEY: local
+    AWS_DEFAULT_REGION: us-west-1
+    SQS_QUEUE_URL: http://localhost:9324/000000000000/data-raw-q
+
+functions:
+  addDetails:
+    handler: processor/spotify_processor.add_details
+    events:
+      - sqs:
+          queueName: data-raw-q
+          arn : 
+            Fn::GetAtt:
+              - data-raw-q
+              - Arn
+          batchSize: 1
+
+resources:
+  Resources:
+    data-raw-q:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: data-raw-q
+
+plugins:
+  - serverless-webpack
+  - serverless-offline-sqs
+  - serverless-offline
+
+
+custom:
+  serverless-offline-sqs:
+    endpoint: http://0.0.0.0:9324
+    region: us-west-1
+    accessKeyId: local
+    secretAccessKey: local
+    skipCacheInvalidation: false

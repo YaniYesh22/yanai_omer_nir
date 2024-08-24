@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Spotify Chart Processor
+
+Resources:
+  ProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: processor/
+      Handler: spotify_processor.add_details
+      Runtime: python3.8
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt DataRawQueue.Arn
+            BatchSize: 1
+
+  DataRawQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: data-raw-q
+
+Outputs:
+  QueueUrl:
+    Description: "URL of the SQS Queue"
+    Value: !Ref DataRawQueue

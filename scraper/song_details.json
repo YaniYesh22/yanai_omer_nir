@@ -1,0 +1,25 @@
+{
+  "song_name": "Dusk Baby",
+  "artists": [
+    "Gerald Clayton"
+  ],
+  "genre": "contemporary jazz",
+  "duration_ms": 339093,
+  "language": "Unknown",
+  "spotify_url": "https://open.spotify.com/track/3LjNhqsx1W63Lu7nOu4xUF",
+  "artist_type": "artist",
+  "artist_genres": [
+    "contemporary jazz",
+    "jazz",
+    "modern jazz piano",
+    "straight-ahead jazz"
+  ],
+  "artist_popularity": 33,
+  "release_date": "2013-01-01",
+  "album": "Life Forum",
+  "popularity": 14,
+  "explicit": false,
+  "tempo": 140.917,
+  "key": 10,
+  "time_signature": 4
+}
