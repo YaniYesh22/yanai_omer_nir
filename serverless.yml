@@ -1,16 +1,15 @@
 service: serverless-offline-sqs
 
-frameworkVersion: '3'
+frameworkVersion: "3"
 
 provider:
   name: aws
-  runtime: python3.8  # Changed to Python runtime
+  runtime: python3.8 
   environment:
     AWS_ACCESS_KEY_ID: local
     AWS_SECRET_ACCESS_KEY: local
     AWS_DEFAULT_REGION: us-west-1
-    SQS_QUEUE_URL: http://localhost:9324/000000000000/data-raw-q
-
+    SQS_QUEUE_URL: http://sqs:9324/000000000000/data-raw-q
 
 functions:
   receiver:
@@ -31,17 +30,16 @@ resources:
         QueueName: data-raw-q
 
 plugins:
-  - serverless-offline
+  - serverless-python-requirements
   - serverless-offline-sqs
+  - serverless-offline
 
 custom:
   serverless-offline-sqs:
-    autoCreate: true  
-    apiVersion: '2012-11-05'
+    autoCreate: true
+    apiVersion: "2012-11-05"
     endpoint: http://sqs:9324
     region: us-west-1
     accessKeyId: local
     secretAccessKey: local
     skipCacheInvalidation: false
-
-
