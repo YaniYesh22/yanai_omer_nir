@@ -16,15 +16,16 @@ services:
       ports:
         - "3001:3001"
       environment:
-        AWS_ACCESS_KEY_ID: local
-        AWS_SECRET_ACCESS_KEY: local
-        AWS_DEFAULT_REGION: us-west-1
-        SQS_QUEUE_URL: http://sqs:9324/000000000000/data-raw-q
+        - AWS_ACCESS_KEY_ID=local
+        - AWS_SECRET_ACCESS_KEY=local
+        - AWS_DEFAULT_REGION=us-west-1
+        - AWS_ENDPOINT_URL=http://sqs:9324
+        - SQS_QUEUE_URL=http://sqs:9324/queue/data-raw-q
       depends_on:
         - sqs
       volumes:
         - .:/usr/src/app
-      command: serverless-offline start --host 0.0.0.0 --port 3001
+      command: node --inspect=0.0.0.0:9229 ./node_modules/.bin/serverless offline start --config serverless.yml --dockerHost host.docker.internal --dockerHostServicePath ${PWD} --host 0.0.0.0 --noPrependStageInUrl --stage local
       networks:
         - spotify_chart_network
 
