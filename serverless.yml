@@ -11,6 +11,7 @@ provider:
     AWS_DEFAULT_REGION: us-west-1
     SQS_QUEUE_URL: http://localhost:9324/000000000000/data-raw-q
 
+
 functions:
   receiver:
     handler: processor/spotify_processor.add_details
@@ -18,7 +19,7 @@ functions:
       - sqs:
           arn:
             Fn::GetAtt:
-              - data-raw-q
+              - DataRawQueue
               - Arn
           batchSize: 1
 
@@ -35,10 +36,12 @@ plugins:
 
 custom:
   serverless-offline-sqs:
-    autoCreate: true  # Automatically create queues in offline mode
+    autoCreate: true  
     apiVersion: '2012-11-05'
-    endpoint: http://0.0.0.0:9324
+    endpoint: http://sqs:9324
     region: us-west-1
     accessKeyId: local
     secretAccessKey: local
     skipCacheInvalidation: false
+
+
