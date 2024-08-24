@@ -1,0 +1,88 @@
+{
+  "/usr/src/app": {
+    "versionSfCore": null,
+    "versionFramework": "4.2.3",
+    "isWithinCompose": false,
+    "isCompose": false,
+    "composeOrgName": null,
+    "composeServiceName": null,
+    "servicePath": "/usr/src/app",
+    "serviceConfigFileName": "serverless.yml",
+    "service": {
+      "service": "serverless-offline-sqs",
+      "frameworkVersion": "3",
+      "provider": {
+        "name": "aws",
+        "runtime": "python3.8",
+        "environment": {
+          "AWS_ACCESS_KEY_ID": "<REDACTED>",
+          "AWS_SECRET_ACCESS_KEY": "<REDACTED>",
+          "AWS_DEFAULT_REGION": "us-west-1",
+          "SQS_QUEUE_URL": "http://localhost:9324/000000000000/data-raw-q"
+        }
+      },
+      "functions": {
+        "receiver": {
+          "handler": "processor/spotify_processor.add_details",
+          "events": [
+            {
+              "sqs": {
+                "arn": {
+                  "Fn::GetAtt": [
+                    "data-raw-q",
+                    "Arn"
+                  ]
+                },
+                "batchSize": 1
+              }
+            }
+          ]
+        }
+      },
+      "resources": {
+        "Resources": {
+          "DataRawQueue": {
+            "Type": "AWS::SQS::Queue",
+            "Properties": {
+              "QueueName": "data-raw-q"
+            }
+          }
+        }
+      },
+      "plugins": [
+        "serverless-offline",
+        "serverless-offline-sqs"
+      ],
+      "custom": {
+        "serverless-offline-sqs": {
+          "autoCreate": true,
+          "apiVersion": "2012-11-05",
+          "endpoint": "http://0.0.0.0:9324",
+          "region": "us-west-1",
+          "accessKeyId": "<REDACTED>",
+          "secretAccessKey": "<REDACTED>",
+          "skipCacheInvalidation": false
+        }
+      }
+    },
+    "serviceRawFile": "service: serverless-offline-sqs\n\nframeworkVersion: '3'\n\nprovider:\n  name: aws\n  runtime: python3.8  # Changed to Python runtime\n  environment:\n    AWS_ACCESS_KEY_ID: local\n    AWS_SECRET_ACCESS_KEY: local\n    AWS_DEFAULT_REGION: us-west-1\n    SQS_QUEUE_URL: http://localhost:9324/000000000000/data-raw-q\n\nfunctions:\n  receiver:\n    handler: processor/spotify_processor.add_details\n    events:\n      - sqs:\n          arn:\n            Fn::GetAtt:\n              - data-raw-q\n              - Arn\n          batchSize: 1\n\nresources:\n  Resources:\n    DataRawQueue:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: data-raw-q\n\nplugins:\n  - serverless-offline\n  - serverless-offline-sqs\n\ncustom:\n  serverless-offline-sqs:\n    autoCreate: true  # Automatically create queues in offline mode\n    apiVersion: '2012-11-05'\n    endpoint: http://0.0.0.0:9324\n    region: us-west-1\n    accessKeyId: local\n    secretAccessKey: local\n    skipCacheInvalidation: false",
+    "command": [
+      "offline",
+      "start"
+    ],
+    "options": {
+      "host": "0.0.0.0",
+      "port": "3001"
+    },
+    "error": {
+      "message": "You must sign in or use a license key with Serverless Framework V.4 and later versions. Please use \"serverless login\".",
+      "stack": "Error: You must sign in or use a license key with Serverless Framework V.4 and later versions. Please use \"serverless login\".\n    at Authentication.getAuthenticatedData (file:///root/.serverless/releases/4.2.3/package/dist/sf-core.js:940:10542)\n    at async Authentication.resolverAuthenticate (file:///root/.serverless/releases/4.2.3/package/dist/sf-core.js:942:20540)\n    at async _Meta.authenticateAndResolve (file:///root/.serverless/releases/4.2.3/package/dist/sf-core.js:950:11261)\n    at async route (file:///root/.serverless/releases/4.2.3/package/dist/sf-core.js:950:16849)\n    at async Object.run2 [as run] (file:///root/.serverless/releases/4.2.3/package/dist/sf-core.js:950:17334)\n    at async run3 (file:///root/.serverless/releases/4.2.3/package/dist/sf-core.js:950:18594)"
+    },
+    "machineId": "1f9ed29a195d7fa6182cd8ac950b9eb8",
+    "serviceProviderAwsCfStackId": null,
+    "serviceProviderAwsCfStackCreated": null,
+    "serviceProviderAwsCfStackUpdated": null,
+    "serviceProviderAwsCfStackStatus": null,
+    "serviceProviderAwsCfStackOutputs": null
+  }
+}

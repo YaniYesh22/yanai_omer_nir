@@ -4,7 +4,7 @@ frameworkVersion: '3'
 
 provider:
   name: aws
-  runtime: nodejs8.10
+  runtime: python3.8  # Changed to Python runtime
   environment:
     AWS_ACCESS_KEY_ID: local
     AWS_SECRET_ACCESS_KEY: local
@@ -12,12 +12,11 @@ provider:
     SQS_QUEUE_URL: http://localhost:9324/000000000000/data-raw-q
 
 functions:
-  addDetails:
+  receiver:
     handler: processor/spotify_processor.add_details
     events:
       - sqs:
-          queueName: data-raw-q
-          arn : 
+          arn:
             Fn::GetAtt:
               - data-raw-q
               - Arn
@@ -25,19 +24,19 @@ functions:
 
 resources:
   Resources:
-    data-raw-q:
+    DataRawQueue:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: data-raw-q
 
 plugins:
-  - serverless-webpack
-  - serverless-offline-sqs
   - serverless-offline
-
+  - serverless-offline-sqs
 
 custom:
   serverless-offline-sqs:
+    autoCreate: true  # Automatically create queues in offline mode
+    apiVersion: '2012-11-05'
     endpoint: http://0.0.0.0:9324
     region: us-west-1
     accessKeyId: local
