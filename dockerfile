@@ -1,24 +1,21 @@
-# Use an official Python runtime as a parent image
-FROM python:3.8-slim
+# Use an official Node.js runtime, Node 18 in this case
+FROM node:18
 
 # Set the working directory in the container
-WORKDIR /app
+WORKDIR /usr/src/app
 
-# Copy the main requirements.txt file and install packages
-COPY requirements.txt /app/
+# Copy the package.json and install dependencies
+COPY package*.json ./
+RUN npm install
 
-RUN pip install --no-cache-dir -r /app/requirements.txt
+# Install the Serverless Framework and serverless-offline-sqs globally
+RUN npm install -g serverless-offline serverless-offline-sqs
 
-ENV AWS_ACCESS_KEY_ID=local
-ENV AWS_SECRET_ACCESS_KEY=local
-ENV AWS_DEFAULT_REGION=us-west-1
-ENV AWS_ENDPOINT_URL=http://sqs:9324
+# Copy the rest of the application code
+COPY . .
 
-# Copy the application code into the container
-COPY . /app
+# Expose the port that serverless-offline will run on
+EXPOSE 3001
 
-# Expose the port based on the service
-WORKDIR /app/scraper
-
-# Command to run the application
-CMD ["uvicorn", "spotify:app", "--host", "0.0.0.0", "--port", "3000"]
+# Start the Serverless Offline service
+CMD ["serverless-offline", "--host", "0.0.0.0", "--port", "3001"]

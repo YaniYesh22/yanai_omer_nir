@@ -73,7 +73,6 @@ def send_to_sqs(data):
     if queue_url and sqs:
         compressed_message = compress_message(data)
         if data:
-
         # if len(compressed_message) <= 256 * 1024:  # Ensure the message doesn't exceed 256 KB
             response = sqs.send_message(
                 QueueUrl=queue_url,
@@ -112,6 +111,16 @@ async def scrape():
         create_queue()
     if queue_url and sqs:
         fetch_all_charts()
+        return JSONResponse(content={"message": "Data fetched and sent to SQS."})
+    else:
+        return JSONResponse(content={"error": "Failed to send data to SQS."}, status_code=500)
+    
+@app.post("/send")
+async def scrape():
+    if not queue_url:
+        create_queue()
+    if queue_url and sqs:
+        send_to_sqs(json.dumps('send Data', ensure_ascii=False))
         return JSONResponse(content={"message": "Data fetched and sent to SQS."})
     else:
         return JSONResponse(content={"error": "Failed to send data to SQS."}, status_code=500)
