@@ -1,15 +1,15 @@
 {
   "name": "data-pipline",
   "version": "1.0.0",
-  "devDependencies": {
-    "serverless-offline": "^8.8.1",
-    "serverless-offline-sqs": "^6.0.0",
-    "serverless-python-requirements": "^6.1.1"
-  },
   "description": "Data pipline final project",
   "main": "index.js",
   "dependencies": {
-    "serverless": "^3.0.0"
+    "install": "^0.13.0",
+    "npm": "^10.8.2",
+    "serverless": "^3.38.0",
+    "serverless-offline": "8.8.0",
+    "serverless-offline-sqs-external": "^1.0.6",
+    "serverless-python-requirements": "^6.1.1"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

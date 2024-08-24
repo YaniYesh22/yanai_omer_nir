@@ -19,4 +19,5 @@ RUN apt-get update && \
 # Initialize npm and install Node.js dependencies
 RUN npm i
 
-CMD ["node", "--inspect=0.0.0.0:9229", "./node_modules/.bin/serverless", "offline", "start", "--config", "serverless.yml", "--dockerHost", "host.docker.internal", "--dockerHostServicePath", "${PWD}", "--host", "0.0.0.0", "--noPrependStageInUrl", "--stage", "local"]
+
+CMD ["./node_modules/.bin/serverless", "offline", "start", "--config", "serverless.yml", "--dockerHost", "host.docker.internal", "--host", "0.0.0.0", "--noPrependStageInUrl"]
