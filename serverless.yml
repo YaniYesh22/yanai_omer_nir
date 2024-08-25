@@ -1,27 +1,18 @@
-service: serverless-offline-sqs
+service: data-pipeline
 
-frameworkVersion: '3'
+frameworkVersion: ">=3.0.0"
 
 provider:
   name: aws
-  runtime: python3.8  # Changed to Python runtime
-  environment:
-    AWS_ACCESS_KEY_ID: local
-    AWS_SECRET_ACCESS_KEY: local
-    AWS_DEFAULT_REGION: us-west-1
-    SQS_QUEUE_URL: http://localhost:9324/000000000000/data-raw-q
-
+  runtime: python3.8
+  region: us-west-1
+  stage: local
 
 functions:
   receiver:
     handler: processor/spotify_processor.add_details
     events:
-      - sqs:
-          arn:
-            Fn::GetAtt:
-              - DataRawQueue
-              - Arn
-          batchSize: 1
+      - sqs: arn:aws:sqs:us-west-1:000000000000:data-raw-q
 
 resources:
   Resources:
@@ -31,17 +22,18 @@ resources:
         QueueName: data-raw-q
 
 plugins:
+  - serverless-python-requirements
+  - serverless-offline-sqs-external
   - serverless-offline
-  - serverless-offline-sqs
 
 custom:
-  serverless-offline-sqs:
-    autoCreate: true  
+  serverless-offline-sqs-external:
+    autoCreate: true
+    https: false
     apiVersion: '2012-11-05'
-    endpoint: http://sqs:9324
+    host: sqs
+    port: 9324
     region: us-west-1
-    accessKeyId: local
-    secretAccessKey: local
+    accessKeyId: root
+    secretAccessKey: root
     skipCacheInvalidation: false
-
-

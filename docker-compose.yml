@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   sqs:
@@ -7,27 +7,38 @@ services:
     ports:
       - "9324:9324"
     volumes:
-      - ./elasticmq.conf:/elasticmq.conf
+      - ./elasticmq.conf:/elasticmq.conf # it seems the queueue is not created here
 
+  sqs-create:
+    image: ubuntu:latest
+    container_name: sqs-create
+    working_dir: /project
+    volumes:
+      - ./create-queues.sh:/project/create-queues.sh:ro
+    environment:
+      - AWS_ACCESS_KEY_ID=local
+      - AWS_SECRET_ACCESS_KEY=local
+      - AWS_DEFAULT_REGION=us-west-1
+      - AWS_ENDPOINT_URL=http://sqs:9324
+    entrypoint: sh -c "apt-get update && apt-get install -y curl && sh ./create-queues.sh"
+    depends_on:
+      - sqs
 
-  serverless-offline:
-      build:
-        context: .
-      ports:
-        - "3001:3001"
-      environment:
-        - AWS_ACCESS_KEY_ID=local
-        - AWS_SECRET_ACCESS_KEY=local
-        - AWS_DEFAULT_REGION=us-west-1
-        - AWS_ENDPOINT_URL=http://sqs:9324
-        - SQS_QUEUE_URL=http://sqs:9324/queue/data-raw-q
-      depends_on:
-        - sqs
-      volumes:
-        - .:/usr/src/app
-      command: node --inspect=0.0.0.0:9229 ./node_modules/.bin/serverless offline start --config serverless.yml --dockerHost host.docker.internal --dockerHostServicePath ${PWD} --host 0.0.0.0 --noPrependStageInUrl --stage local
-      networks:
-        - spotify_chart_network
+  # if it's not wait for the queue, run: docker compose up --no-deps --force-recreate -d data-pipeline
+  data-pipeline:
+    build:
+      context: .
+    ports:
+      - "3001:3001"
+    container_name: data-pipeline
+    environment:
+      - NODE_ENV=test
+      - AWS_ACCESS_KEY_ID=root
+      - AWS_SECRET_ACCESS_KEY=root
+      - AWS_DEFAULT_REGION=us-west-1
+      - AWS_ENDPOINT_URL=http://sqs:9324
+    depends_on:
+      - sqs-create
 
   scraper:
     container_name: scraper
@@ -36,36 +47,30 @@ services:
     ports:
       - "3000:3000"
     environment:
-      AWS_ACCESS_KEY_ID: local
-      AWS_SECRET_ACCESS_KEY: local
+      NODE_ENV: test
+      AWS_ACCESS_KEY_ID: root
+      AWS_SECRET_ACCESS_KEY: root
       AWS_DEFAULT_REGION: us-west-1
       AWS_ENDPOINT_URL: http://sqs:9324
       SQS_QUEUE_URL: http://sqs:9324/queue/data-raw-q
     depends_on:
-      - sqs
-    networks:
-      - spotify_chart_network
+      - sqs-create
 
-  processor:
-    container_name: processor
-    build:
-      context: ./processor
-    environment:
-      AWS_ACCESS_KEY_ID: local
-      AWS_SECRET_ACCESS_KEY: local
-      AWS_DEFAULT_REGION: us-west-1
-      AWS_ENDPOINT_URL: http://sqs:9324
-      SQS_QUEUE_URL: http://sqs:9324/queue/data-raw-q
-    depends_on:
-      - sqs
-    networks:
-      - spotify_chart_network
-    command: python -u spotify_processor.py
 
-  
-networks:
-  spotify_chart_network:
-    driver: bridge
+  # processor:
+  #   container_name: processor
+  #   build:
+  #     context: ./processor
+  #   environment:
+  #     AWS_ACCESS_KEY_ID: local
+  #     AWS_SECRET_ACCESS_KEY: local
+  #     AWS_DEFAULT_REGION: us-west-1
+  #     AWS_ENDPOINT_URL: http://sqs:9324
+  #     SQS_QUEUE_URL: http://sqs:9324/queue/data-raw-q
+  #   depends_on:
+  #     - sqs
+  #   networks:
+  #     - spotify_chart_network
 
 volumes:
   postgres_data:
