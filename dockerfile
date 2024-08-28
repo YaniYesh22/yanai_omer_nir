@@ -17,18 +17,12 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Add NodeSource GPG key
-RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg
+RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg
 
 # Add NodeSource repository
 RUN echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x bullseye main" | tee /etc/apt/sources.list.d/nodesource.list
 
-# Update Debian keyring
-RUN apt-get update && \
-    apt-get install -y debian-archive-keyring && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install Node.js and npm
+# Update Debian keyring and install Node.js and npm
 RUN apt-get update && \
     apt-get install -y nodejs && \
     apt-get clean && \

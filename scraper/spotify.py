@@ -43,7 +43,7 @@ app = FastAPI()
 ###############################################################
 # API endpoint and token
 BASE_URL = "https://charts-spotify-com-service.spotify.com/auth/v0/charts/regional-us-weekly/"
-TOKEN = "BQDlrfjEgfqYM4Zva8AeLjylX_Q3Z27BDfob8jSrTeU569Pr0qfYD2YF0EBFqFjfkcJV3SfYNXQlzDs0sj9q_gowVc9GTW_JR_6U7A_xnVnzOcFB6cRko3AzOTNdGcLTzrbmfVhzPP1En0RB_3OvoNreC-FMgRlX9B7IiXCJoN1iT2glHfFg0O6xFEYjRZCuMu0067ne"
+TOKEN = "BQDBCc8Bd5esEzHQhc0DdQ_WtiOj6P9_wigSP_Nmo634ClMs9RD68Cg4zWakgmjng5DbSypOx8hCmhHjgtHExCraMI-Zzx5sUpFQo8J7sv8N7TYwShGIN9fgVpFUvAQjVieTwa9NLE_XrpyUxMWkooI7gtYQ50s4-ijr-8bEnPC6L3as1spCS4Fu-ppZM0yJywdFUrDu"
 
 
 # Fetch and save chart data
