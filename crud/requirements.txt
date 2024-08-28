@@ -1,0 +1,13 @@
+requests==2.32.3
+beautifulsoup4==4.12.3
+python-dotenv==1.0.1
+fastapi==0.111.1
+boto3
+uvicorn
+psycopg2-binary
+musicbrainzngs
+databases
+sqlalchemy
+pydantic
+typing
+asyncpg

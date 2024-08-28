@@ -3,4 +3,11 @@ beautifulsoup4==4.12.3
 python-dotenv==1.0.1
 fastapi==0.111.1
 boto3==1.18.0
-
+musicbrainzngs
+databases
+sqlalchemy
+uvicorn
+pydantic
+typing
+asyncpg
+psycopg2-binary

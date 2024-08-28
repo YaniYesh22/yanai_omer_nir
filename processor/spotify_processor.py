@@ -1,180 +1,232 @@
-import requests
-import base64
 import json
 import time
-from collections import defaultdict
+from musicbrainzngs import musicbrainz, WebServiceError, ResponseError, NetworkError, MusicBrainzError
 import boto3
-import os
-import gzip
+import random  
+import time
+from datetime import datetime
+import databases
+import sqlalchemy
+from sqlalchemy import insert
+import sqlite3
+import psycopg2
+from psycopg2.extras import Json
 
-# Spotify API credentials
-CLIENT_ID = '80dbd3be02894ebfb4aabcc28081dc79'
-CLIENT_SECRET = 'd469c99ab4d44d008d2d844e929677b2'
+DATABASE_URL = "postgres://myuser:1234@postgres:5432/chartsdb"
+database = databases.Database(DATABASE_URL)
+metadata = sqlalchemy.MetaData()
 
-def get_access_token():
-    auth_string = f"{CLIENT_ID}:{CLIENT_SECRET}"
-    auth_bytes = auth_string.encode('utf-8')
-    auth_base64 = str(base64.b64encode(auth_bytes), 'utf-8')
+charts = sqlalchemy.Table(
+    "charts",
+    metadata,
+    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
+    sqlalchemy.Column("date", sqlalchemy.Date, nullable=False),
+    sqlalchemy.Column("song_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("songs.id")),
+    sqlalchemy.Column("current_rank", sqlalchemy.Integer)
+)
 
-    url = "https://accounts.spotify.com/api/token"
-    headers = {
-        "Authorization": f"Basic {auth_base64}",
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-    data = {"grant_type": "client_credentials"}
+songs = sqlalchemy.Table(
+    "songs",
+    metadata,
+    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
+    sqlalchemy.Column("title", sqlalchemy.String, nullable=False),
+    sqlalchemy.Column("length", sqlalchemy.Integer),
+    sqlalchemy.Column("album", sqlalchemy.String),
+    sqlalchemy.Column("release_date", sqlalchemy.Date)
+)
+
+artists = sqlalchemy.Table(
+    "artists",
+    metadata,
+    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
+    sqlalchemy.Column("name", sqlalchemy.String, nullable=False),
+    sqlalchemy.Column("disambiguation", sqlalchemy.Text),
+    sqlalchemy.Column("country", sqlalchemy.String(3)),
+    sqlalchemy.Column("life_span", sqlalchemy.JSON),
+    sqlalchemy.Column("gender", sqlalchemy.String(50)),
+    sqlalchemy.Column("type", sqlalchemy.String(50))
+)
+
+# Configure MusicBrainz API
+musicbrainz.set_useragent("MusicDataEnricher", "1.0", "your-email@example.com")
+musicbrainz.set_rate_limit(limit_or_interval=1.0, new_requests=1)
+
+def get_artist_info(artist_name, max_retries=25, backoff_factor=1.5):
+    for attempt in range(max_retries):
+        try:
+            result = musicbrainz.search_artists(artist=artist_name, limit=1)
+            if result['artist-list']:
+                artist = result['artist-list'][0]
+                artist_id = artist['id']
+                artist_details = musicbrainz.get_artist_by_id(artist_id, includes=['tags', 'recordings', 'releases'])
+
+                genres = [tag['name'] for tag in artist_details['artist'].get('tag-list', [])]
+
+                return {
+                    "name": artist_details['artist'].get('name'),
+                    "disambiguation": artist_details['artist'].get('disambiguation'),
+                    "country": artist_details['artist'].get('country'),
+                    "life-span": artist_details['artist'].get('life-span'),
+                    "gender": artist_details['artist'].get('gender'),
+                    "type": artist_details['artist'].get('type'),
+                    "genres": genres,
+                    "tags": artist_details['artist'].get('tag-list', []),
+                    "recording_count": artist_details['artist'].get('recording-count'),
+                    "release_count": artist_details['artist'].get('release-count'),
+                }
+        except (WebServiceError, ResponseError, NetworkError) as e:
+            print(f"Error fetching artist info from MusicBrainz for {artist_name}: {e}")
+            if attempt < max_retries - 1:
+                sleep_time = (backoff_factor ** attempt) + random.uniform(0, 1)
+                print(f"Retrying in {sleep_time:.2f} seconds...")
+                time.sleep(sleep_time)
+            else:
+                print(f"Failed to fetch artist info for {artist_name} after {max_retries} attempts.")
+                return None
+            
+
+def get_song_info(song_name, artist_name, max_retries=25, backoff_factor=1.5):
+    for attempt in range(max_retries):
+        try:
+            result = musicbrainz.search_recordings(recording=song_name, artist=artist_name, limit=1)
+            if result['recording-list']:
+                recording = result['recording-list'][0]
+                return {
+                    "title": recording.get('title'),
+                    "length": recording.get('length'),
+                    "album": recording.get('release-list')[0]['title'] if recording.get('release-list') else None,
+                    "tags": recording.get('tag-list', [])
+                }
+        except (WebServiceError, ResponseError, NetworkError, MusicBrainzError) as e:
+            print(f"Error fetching song info from MusicBrainz for {song_name}: {e}")
+
+            # Check if the error is a rate limiting error (HTTP 429)
+            if "503" in str(e) or "429" in str(e):
+                print(f"Rate limit encountered. Attempt {attempt + 1} of {max_retries}.")
+
+            if attempt < max_retries - 1:
+                sleep_time = backoff_factor ** attempt + random.uniform(0, 1)
+                print(f"Retrying in {sleep_time:.2f} seconds...")
+                time.sleep(sleep_time)
+            else:
+                print(f"Failed to fetch song info for {song_name} after {max_retries} attempts.")
+                return None
+            
+
+def enrich_data(data):
+    enriched_data = {}
     
-    try:
-        result = requests.post(url, headers=headers, data=data)
-        result.raise_for_status()  # Raise an exception for HTTP errors
-        json_result = result.json()
-        token = json_result["access_token"]
-        return token
-    except requests.exceptions.RequestException as e:
-        print(f"Error obtaining access token: {e}")
-        return None
-
-def search_artist(token, artist_name):
-    url = "https://api.spotify.com/v1/search"
-    headers = {"Authorization": f"Bearer {token}"}
-    params = {
-        "q": artist_name,
-        "type": "artist",
-        "limit": 1
-    }
-    
-    try:
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        
-        search_data = response.json()
-        if search_data.get('artists', {}).get('items'):
-            return search_data['artists']['items'][0]
-        else:
-            print(f"No artist found for '{artist_name}'")
-            return None
-    except requests.exceptions.RequestException as e:
-        print(f"Failed to search for artist '{artist_name}': {e}")
-        return None
-
-def get_artist_details(token, artist_id):
-    url = f"https://api.spotify.com/v1/artists/{artist_id}"
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        artist_data = response.json()
-        
-        return {
-            "name": artist_data.get('name', 'Unknown'),
-            "genres": artist_data.get('genres', []),
-            "popularity": artist_data.get('popularity', 0),
-            "followers": artist_data.get('followers', {}).get('total', 0),
-            "image_url": artist_data.get('images', [{}])[0].get('url', ''),
-            "spotify_url": artist_data.get('external_urls', {}).get('spotify', '')
-        }
-    except requests.exceptions.RequestException as e:
-        print(f"Failed to get details for artist ID '{artist_id}': {e}")
-        return None
-
-def get_track_details(token, track_name):
-    url = "https://api.spotify.com/v1/search"
-    headers = {"Authorization": f"Bearer {token}"}
-    params = {
-        "q": track_name,
-        "type": "track",
-        "limit": 1
-    }
-    
-    try:
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        
-        track_data = response.json()
-        if track_data.get('tracks', {}).get('items'):
-            track = track_data['tracks']['items'][0]
-            return {
-                "length": track.get('duration_ms', 0),
-                "track_url": track.get('external_urls', {}).get('spotify', ''),
-                "album_name": track['album'].get('name', ''),
-                "release_date": track['album'].get('release_date', ''),
-                "popularity": track.get('popularity', 0)
-            }
-        else:
-            print(f"No track found for '{track_name}'")
-            return None
-    except requests.exceptions.RequestException as e:
-        print(f"Failed to search for track '{track_name}': {e}")
-        return None
-
-def process_charts_with_artist_details(charts_data):
-    token = get_access_token()
-    if not token:
-        print("Failed to obtain Spotify access token.")
-        return {}
-    
-    processed_data = defaultdict(list)
-
-    for date, songs in charts_data.items():
+    for date, songs in data.items():
+        enriched_data[date] = []
         for song in songs:
-            song_with_details = song.copy()
-            track_details = get_track_details(token, song['song_name'])
-
-            if track_details:
-                song_with_details.update(track_details)
-
-            artists_with_details = []
+            song_info = get_song_info(song['song_name'], song['artists'][0])
+            
+            # Process each artist individually
+            artists_info = []
             for artist_name in song['artists']:
-                artist = search_artist(token, artist_name)
-                if artist:
-                    artist_details = get_artist_details(token, artist['id'])
-                    if artist_details:
-                        artists_with_details.append(artist_details)
-                else:
-                    artists_with_details.append({"name": artist_name, "error": "Artist not found"})
-                time.sleep(1)  # To avoid rate limiting
-            song_with_details['artists'] = artists_with_details
-            processed_data[date].append(song_with_details)
-        print(f"Processed data for {date}")
+                artist_info = get_artist_info(artist_name)
+                if artist_info:
+                    artists_info.append(artist_info)
+            
+            enriched_song = song.copy()
+            enriched_song['song_details'] = song_info
+            enriched_song['artist_details'] = artists_info
+            
+            enriched_data[date].append(enriched_song)
+            
+            # Respect rate limits
+            time.sleep(1)
 
-    return dict(processed_data)
+    return enriched_data
 
 def add_details(event, context):
-    print("add_details triggered")
+    print('add_details triggered')
+
+    # Connect to the PostgreSQL database
+    connection = psycopg2.connect(DATABASE_URL)
+    cursor = connection.cursor()
+    print("Connected to PostgreSQL database")
+
     for record in event['Records']:
         try:
-            print(f"Processing record: {record}")
+            print("Processing record")
             message_body = json.loads(record['body'])
-            compressed_message = message_body.get('MessageBody', '')
-            decompressed_message = decompress_message(compressed_message)
-            chart_data = json.loads(decompressed_message)
+            
+            if isinstance(message_body, str):
+                chart_data = json.loads(message_body)
+            else:
+                chart_data = message_body
 
-            # Process the data with artist and track details
-            processed_data = process_charts_with_artist_details(chart_data)
-            if processed_data:
-                print(f"Processed data: {json.dumps(processed_data, indent=2)}")
+            # Enrich the data with additional artist and song details
+            enriched_data = enrich_data(chart_data)
 
-                # Optionally, save the result to a file
-                chart_date = chart_data.get("chart_date", "unknown_date")
-                with open(f'/tmp/processed_chart_{chart_date}.json', 'w', encoding='utf-8') as f:
-                    json.dump(processed_data, f, indent=2, ensure_ascii=False)
+            if enriched_data:
+                print("Enriched data")
 
-                print(f"Processing complete for {chart_date}. Results saved to '/tmp/processed_chart_{chart_date}.json'")
+                # Use the first date in the data as the chart date
+                chart_date = list(chart_data.keys())[0] if chart_data else "unknown_date"
+                output_file = f'/tmp/processed_chart_{chart_date}.json'
+                
+                # Save to JSON
+                with open(output_file, 'w', encoding='utf-8') as f:
+                    json.dump(enriched_data, f, indent=2, ensure_ascii=False)
+
+                print(f"Processing complete for {chart_date}. Results saved to '{output_file}'")
+
+                # Insert into the database
+                insert_into_db(cursor, enriched_data)
+
             else:
                 print("No processed data generated.")
         except Exception as e:
             print(f"Error processing SQS message: {e}")
 
-def decompress_message(compressed_message):
-    try:
-        compressed_bytes = base64.b64decode(compressed_message)
-        decompressed_bytes = gzip.decompress(compressed_bytes)
-        return decompressed_bytes.decode('utf-8')
-    except Exception as e:
-        print(f"Error decompressing message: {e}")
-        return ""
+    # Commit the transaction and close the connection
+    connection.commit()
+    cursor.close()
+    connection.close()
 
-# if __name__ == "__main__":
-#     counter = 0
-#     while(True):
-#         counter+=1
+def insert_into_db(cursor, enriched_data):
+    for date, songs in enriched_data.items():
+        for song in songs:
+            # Insert the song into the songs table
+            song_query = """
+            INSERT INTO songs (title, length, album, release_date) 
+            VALUES (%s, %s, %s, %s) RETURNING id
+            """
+            cursor.execute(song_query, (
+                song['song_name'],
+                song['song_details']['length'],
+                song['song_details']['album'],
+                song['release_date']
+            ))
+            song_id = cursor.fetchone()[0]
+
+            # Insert artists into the artists table
+            for artist_detail in song['artist_details']:
+                artist_query = """
+                INSERT INTO artists (name, disambiguation, country, life_span, gender, type) 
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """
+                cursor.execute(artist_query, (
+                    artist_detail['name'],
+                    artist_detail.get('disambiguation'),
+                    artist_detail.get('country'),
+                    Json(artist_detail.get('life-span')),  # Assuming life-span is a dictionary
+                    artist_detail.get('gender'),
+                    artist_detail.get('type')
+                ))
+                artist_id = cursor.fetchone()[0]
+
+            # Insert the chart record into the charts table
+            chart_query = """
+            INSERT INTO charts (date, song_id, current_rank) 
+            VALUES (%s, %s, %s)
+            """
+            cursor.execute(chart_query, (
+                date,
+                song_id,
+                song['current_rank']
+            ))
+        print(f'Data inserted to {date}')

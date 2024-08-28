@@ -1,0 +1,170 @@
+{
+  "2024-08-22": [
+    {
+      "song_name": "I Had Some Help (Feat. Morgan Wallen)",
+      "current_rank": 1,
+      "artists": [
+        "Post Malone",
+        "Morgan Wallen"
+      ],
+      "release_date": "2024-08-15",
+      "song_details": {
+        "title": "I Had Some Help (Feat. Morgan Wallen)",
+        "length": "178205",
+        "album": "F‐1 Trillion",
+        "tags": []
+      },
+      "artist_details": [
+        {
+          "name": "Post Malone",
+          "disambiguation": null,
+          "country": "US",
+          "life-span": {
+            "begin": "1995-07-04"
+          },
+          "gender": "Male",
+          "type": "Person",
+          "genres": [
+            "2010s",
+            "2020s",
+            "contemporary r&b",
+            "country",
+            "english",
+            "hip hop",
+            "pop rap",
+            "trap"
+          ],
+          "tags": [
+            {
+              "count": "1",
+              "name": "2010s"
+            },
+            {
+              "count": "1",
+              "name": "2020s"
+            },
+            {
+              "count": "1",
+              "name": "contemporary r&b"
+            },
+            {
+              "count": "1",
+              "name": "country"
+            },
+            {
+              "count": "1",
+              "name": "english"
+            },
+            {
+              "count": "5",
+              "name": "hip hop"
+            },
+            {
+              "count": "2",
+              "name": "pop rap"
+            },
+            {
+              "count": "2",
+              "name": "trap"
+            }
+          ],
+          "recording_count": 590,
+          "release_count": 243
+        },
+        {
+          "name": "Morgan Wallen",
+          "disambiguation": "country music singer",
+          "country": "US",
+          "life-span": {
+            "begin": "1993-05-13"
+          },
+          "gender": "Male",
+          "type": "Person",
+          "genres": [
+            "country",
+            "country pop"
+          ],
+          "tags": [
+            {
+              "count": "2",
+              "name": "country"
+            },
+            {
+              "count": "1",
+              "name": "country pop"
+            }
+          ],
+          "recording_count": 187,
+          "release_count": 95
+        }
+      ]
+    },
+    {
+      "song_name": "Good Luck, Babe!",
+      "current_rank": 2,
+      "artists": [
+        "Chappell Roan"
+      ],
+      "release_date": "2024-04-05",
+      "song_details": {
+        "title": "Good Luck, Babe!",
+        "length": "218424",
+        "album": "Good Luck, Babe!",
+        "tags": []
+      },
+      "artist_details": [
+        {
+          "name": "Chappell Roan",
+          "disambiguation": null,
+          "country": "US",
+          "life-span": {
+            "begin": "1998-02-19"
+          },
+          "gender": "Female",
+          "type": "Person",
+          "genres": [
+            "alternative pop",
+            "dance-pop",
+            "gay pop",
+            "indie pop",
+            "pop",
+            "queer",
+            "synth-pop"
+          ],
+          "tags": [
+            {
+              "count": "2",
+              "name": "alternative pop"
+            },
+            {
+              "count": "3",
+              "name": "dance-pop"
+            },
+            {
+              "count": "1",
+              "name": "gay pop"
+            },
+            {
+              "count": "2",
+              "name": "indie pop"
+            },
+            {
+              "count": "2",
+              "name": "pop"
+            },
+            {
+              "count": "6",
+              "name": "queer"
+            },
+            {
+              "count": "4",
+              "name": "synth-pop"
+            }
+          ],
+          "recording_count": 67,
+          "release_count": 83
+        }
+      ]
+    }
+  ]
+}

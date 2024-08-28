@@ -43,8 +43,10 @@ app = FastAPI()
 ###############################################################
 # API endpoint and token
 BASE_URL = "https://charts-spotify-com-service.spotify.com/auth/v0/charts/regional-us-weekly/"
-TOKEN = "BQADJfegDKvieQDts_rjVBt5CM5fQ4INn1o_UqGci7sMX7EK3WRdQPuSvr_w4XLXONKhCe708dPRzmLwhHoNJBEpEzijahy600uM_gI5AUuZNJrb6a9ilc8uQ_TRkpkIvCgNgTR7lUvncLjuHNc7LmExYruDaVi06zneA--po8tSACQpZfJ_myDNub-viyQtDluExdzg"
+TOKEN = "BQDlrfjEgfqYM4Zva8AeLjylX_Q3Z27BDfob8jSrTeU569Pr0qfYD2YF0EBFqFjfkcJV3SfYNXQlzDs0sj9q_gowVc9GTW_JR_6U7A_xnVnzOcFB6cRko3AzOTNdGcLTzrbmfVhzPP1En0RB_3OvoNreC-FMgRlX9B7IiXCJoN1iT2glHfFg0O6xFEYjRZCuMu0067ne"
 
+
+# Fetch and save chart data
 def get_chart_data(date):
     url = BASE_URL + date.strftime("%Y-%m-%d")
     headers = {
@@ -69,24 +71,10 @@ def save_chart_data(data, date):
         json.dump(data, f, ensure_ascii=False, indent=2)
     print(f"Saved data for {date.strftime('%Y-%m-%d')}")
 
-def send_to_sqs(data):
-    if queue_url and sqs:
-        compressed_message = compress_message(data)
-        if data:
-        # if len(compressed_message) <= 256 * 1024:  # Ensure the message doesn't exceed 256 KB
-            response = sqs.send_message(
-                QueueUrl=queue_url,
-                MessageBody=data
-            )
-            print(f"Sent message to SQS: {response['MessageId']}")
-        else:
-            print("Error: Message is too large even after compression.")
-    else:
-        print("Error: Queue URL not available or SQS client not initialized.")
 
 def fetch_all_charts():
-    start_date = datetime(2024, 6, 6)  # First Thursday of July 2024
-    end_date = datetime(2024, 8, 22)   # Last Thursday of August 2024
+    start_date = datetime(2023, 8, 3)
+    end_date = datetime(2024, 8, 16)
     current_date = start_date
 
     while current_date <= end_date:
@@ -95,32 +83,65 @@ def fetch_all_charts():
         
         if chart_data:
             save_chart_data(chart_data, current_date)
-            # Send the data to SQS
-            send_to_sqs(json.dumps(chart_data, ensure_ascii=False))
         
         current_date += timedelta(days=7)  # Move to next Thursday
         time.sleep(1)  # Add a delay to avoid overwhelming the API
 
-def compress_message(message):
-    compressed = gzip.compress(message.encode('utf-8'))
-    return base64.b64encode(compressed).decode('utf-8')
+# Send each chart's data to SQS queue
+def send_chart_to_sqs(chart_date, chart_summary):
+    try:
+        message_body = json.dumps({chart_date: chart_summary})
+        response = sqs.send_message(
+            QueueUrl=queue_url,
+            MessageBody=message_body
+        )
+        print(f"Sent chart data for {chart_date} to SQS. Message ID: {response['MessageId']}")
+    except Exception as e:
+        print(f"Error sending chart data for {chart_date} to SQS: {e}")
+
+# Combine all chart summaries and send each to the SQS queue
+def process_all_charts_and_send_to_sqs():
+    fetch_all_charts()
+    chart_files_directory = "chart_data"
+
+    for file_name in os.listdir(chart_files_directory):
+        file_path = os.path.join(chart_files_directory, file_name)
+
+        with open(file_path, 'r', encoding='utf-8') as f:
+            chart_data = json.load(f)
+            chart_date = chart_data.get("displayChart", {}).get("date", "unknown_date")
+
+            summary_list = []
+
+            # Only process the top 10 entries
+            for entry in chart_data.get("entries", [])[:10]:
+                song_name = entry.get("trackMetadata", {}).get("trackName", "Unknown Song")
+                current_rank = entry.get("chartEntryData", {}).get("currentRank", "Unknown Rank")
+                release_date = entry.get("trackMetadata", {}).get("releaseDate", "Unknown Date")
+                artists = [
+                    artist.get("name", "Unknown Artist")
+                    for artist in entry.get("trackMetadata", {}).get("artists", [])
+                ]
+
+                song_summary = {
+                    "song_name": song_name,
+                    "current_rank": current_rank,
+                    "artists": artists,
+                    "release_date": release_date
+                }
+                summary_list.append(song_summary)
+
+            # Send each date's top 10 chart summary to SQS
+            send_chart_to_sqs(chart_date, summary_list)
+
 
 @app.post("/scrape")
 async def scrape():
     if not queue_url:
         create_queue()
     if queue_url and sqs:
-        fetch_all_charts()
+        process_all_charts_and_send_to_sqs()
         return JSONResponse(content={"message": "Data fetched and sent to SQS."})
     else:
         return JSONResponse(content={"error": "Failed to send data to SQS."}, status_code=500)
     
-@app.post("/send")
-async def scrape():
-    if not queue_url:
-        create_queue()
-    if queue_url and sqs:
-        send_to_sqs(json.dumps('send Data', ensure_ascii=False))
-        return JSONResponse(content={"message": "Data fetched and sent to SQS."})
-    else:
-        return JSONResponse(content={"error": "Failed to send data to SQS."}, status_code=500)
