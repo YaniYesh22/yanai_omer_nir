@@ -1,0 +1,21 @@
+{
+  "2024-08-22": [
+    {
+      "song_name": "I Had Some Help (Feat. Morgan Wallen)",
+      "current_rank": 1,
+      "artists": [
+        "Post Malone",
+        "Morgan Wallen"
+      ],
+      "release_date": "2024-08-15"
+    },
+    {
+      "song_name": "Good Luck, Babe!",
+      "current_rank": 2,
+      "artists": [
+        "Chappell Roan"
+      ],
+      "release_date": "2024-04-05"
+    }
+  ]
+}
