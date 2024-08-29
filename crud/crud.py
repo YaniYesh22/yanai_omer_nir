@@ -1,71 +1,40 @@
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 from typing import List, Optional, Dict
-from datetime import date, datetime
+from fastapi.middleware.cors import CORSMiddleware
+from datetime import date
 import databases
 import sqlalchemy
 import os
-import uvicorn
-import json
+
 # Database URL from environment variable
-DATABASE_URL = os.getenv("DATABASE_URL", "postgres://myuser:1234@localhost:5432/chartsdb")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://myuser:1234@postgres:5432/chartsdb")
 
 # Set up the database connection
 database = databases.Database(DATABASE_URL)
 metadata = sqlalchemy.MetaData()
 
-# Define the tables based on your schema
-charts = sqlalchemy.Table(
-    "charts",
-    metadata,
-    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
-    sqlalchemy.Column("date", sqlalchemy.Date, nullable=False),
-    sqlalchemy.Column("song_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("songs.id")),
-    sqlalchemy.Column("current_rank", sqlalchemy.Integer)
-)
-
-songs = sqlalchemy.Table(
-    "songs",
-    metadata,
-    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
-    sqlalchemy.Column("title", sqlalchemy.String, nullable=False),
-    sqlalchemy.Column("length", sqlalchemy.Integer),
-    sqlalchemy.Column("album", sqlalchemy.String),
-    sqlalchemy.Column("release_date", sqlalchemy.Date),
-    sqlalchemy.Column("spotify_url", sqlalchemy.String)
-)
-
-artists = sqlalchemy.Table(
-    "artists",
-    metadata,
-    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
-    sqlalchemy.Column("name", sqlalchemy.String, nullable=False),
-    sqlalchemy.Column("disambiguation", sqlalchemy.Text),
-    sqlalchemy.Column("country", sqlalchemy.String(3)),
-    sqlalchemy.Column("life_span", sqlalchemy.JSON),
-    sqlalchemy.Column("gender", sqlalchemy.String(50)),
-    sqlalchemy.Column("type", sqlalchemy.String(50))
-)
-
 # Create an instance of FastAPI
 app = FastAPI()
 
+app.add_middleware(CORSMiddleware, allow_origins=['*'])
+
 # Models for input/output
 class SongFeatures(BaseModel):
-    key: Optional[str]
     genre: Optional[str]
-    language: Optional[str]
 
 class ArtistFeatures(BaseModel):
     type: Optional[str]
+    gender: Optional[str]
+    country: Optional[str]
 
 class ChartEntry(BaseModel):
     position: int
     song: str
     artist: str
     album: Optional[str]
-    duration: str
-    spotify_url: Optional[str]
+    duration: Optional[str]
+    release_date: Optional[date]
     songFeatures: Optional[SongFeatures]
     artistFeatures: Optional[ArtistFeatures]
 
@@ -81,30 +50,27 @@ async def startup():
 async def shutdown():
     await database.disconnect()
 
-
 @app.get("/charts", response_model=List[ChartResponse])
 async def read_charts(date: Optional[date] = Query(None)):
+    query = """
+    SELECT c.date, c.current_rank, s.title, s.album, s.length, s.release_date, 
+           a.name as artist_name, a.type as artist_type, a.gender, a.country, a.disambiguation,
+           string_agg(DISTINCT g.name, ', ') as genres
+    FROM charts c
+    JOIN songs s ON c.song_id = s.id
+    JOIN artists a ON a.id = s.id
+    LEFT JOIN artist_genres ag ON a.id = ag.artist_id
+    LEFT JOIN genres g ON ag.genre_id = g.id
+    """
+    
     if date:
-        query = """
-        SELECT c.date, c.current_rank, s.title, s.album, s.length, s.spotify_url, 
-               a.name as artist_name, a.type as artist_type, a.life_span
-        FROM charts c
-        JOIN songs s ON c.song_id = s.id
-        JOIN artists a ON a.id = s.id
-        WHERE c.date = :date
-        ORDER BY c.date, c.current_rank
-        """
+        query += " WHERE c.date = :date"
         values = {"date": date}
     else:
-        query = """
-        SELECT c.date, c.current_rank, s.title, s.album, s.length, s.spotify_url, 
-               a.name as artist_name, a.type as artist_type, a.life_span
-        FROM charts c
-        JOIN songs s ON c.song_id = s.id
-        JOIN artists a ON a.id = s.id
-        ORDER BY c.date, c.current_rank
-        """
         values = {}
+    
+    query += " GROUP BY c.date, c.current_rank, s.title, s.album, s.length, s.release_date, a.name, a.type, a.gender, a.country,  a.disambiguation"
+    query += " ORDER BY c.date, c.current_rank"
     
     try:
         chart_records = await database.fetch_all(query=query, values=values)
@@ -117,10 +83,10 @@ async def read_charts(date: Optional[date] = Query(None)):
         if chart_date not in charts_by_date:
             charts_by_date[chart_date] = []
 
-        duration_seconds = record['length'] if record['length'] is not None else 0
-        duration = f"{duration_seconds // 60}:{duration_seconds % 60:02d}"
-        
-        life_span = json.loads(record['life_span']) if record['life_span'] else {}
+        duration_ms = record['length'] if record['length'] is not None else 0
+        total_seconds = duration_ms // 1000  # Convert milliseconds to seconds
+        minutes, seconds = divmod(total_seconds, 60)
+        duration = f"{minutes}:{seconds:02d}" if duration_ms else None
         
         charts_by_date[chart_date].append(ChartEntry(
             position=record['current_rank'],
@@ -128,19 +94,16 @@ async def read_charts(date: Optional[date] = Query(None)):
             artist=record['artist_name'],
             album=record['album'],
             duration=duration,
-            spotify_url=record['spotify_url'],
-            songFeatures=SongFeatures(
-                key=None,
-                genre=None,
-                language=None
-            ),
-            artistFeatures=ArtistFeatures(
-                type=record['artist_type']
+            release_date=record['release_date'],
+            songFeatures=dict(genre=record['disambiguation']),
+            artistFeatures=dict(
+                type=record['gender'],
+                gender=record['gender'],
+                country=record['country']
             )
         ))
 
-    return [ChartResponse(date=d, charts={"US": entries}) for d, entries in charts_by_date.items()]
-
+    return [{"date": d, "charts": {"US": entries}} for d, entries in charts_by_date.items()]
 
 @app.get("/charts/available-dates")
 async def get_available_dates():
@@ -163,4 +126,5 @@ async def get_available_dates():
     return date_dict
 
 if __name__ == "__main__":
+    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
